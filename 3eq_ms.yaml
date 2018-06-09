@@ -1,0 +1,101 @@
+declarations:
+  name: 'ghls'
+  variables: [y, R, dp, e, z, ylag]
+  shocks: [eps_e, eps_z, eps_r]
+  parameters: [beta_tr,  sigma_r, rho_e, sigma_e, rho_z, sigma_z, rho_R, psi_dp, psi_y, sigma_r4, rho_r4]
+  para_func: [gamma, spread, alp, phi, a, piss_tr,eps, theta, beta, nu, piss, omega, kappap, xi]
+  observables: [pot, infl, int]
+  measurement_errors: [meas_pot, meas_infl, meas_int]
+equations:
+  model:
+    # euler
+    - (1 + nu*(1+theta))*y = nu*y(-1) + (1+nu)*theta*y(+1) - theta*(R - dp(+1) - (1+nu)*z(+1)) - nu*z + e
+    # philips curve
+    - dp = (1-a)*omega*dp(-1) + beta*omega*dp(+1) +  omega * kappap * xi*y - omega*kappap*nu*(y(-1) - z)
+    # monetary policy
+    - R = rho_R*R(-1) + (1-rho_R)*(psi_dp*dp + psi_y*y) + eps_r 
+    # technology
+    - z = rho_z * z(-1) + eps_z
+
+    # risk premium
+    - e = rho_e * e(-1) + eps_e
+    - ylag = y(-1)
+  observables:
+    pot : y
+    # inflation observable is ANNUALIZED
+    infl : 4*piss_tr + 4*dp
+    # our interest rate observable is ANNUALIZED
+    int : 400*log(piss*theta/beta)  + 4*R
+
+calibration:
+  parafunc:
+    beta : 1/(1+beta_tr/100)
+    eps : 6
+    kappap : (eps-1) / phi
+    theta : exp(-spread/100)
+    nu :  gamma / (1.0-gamma)
+    piss : 1+piss_tr/100
+    omega : 1.0/(1.0+beta*(1.0-a))
+    xi : (1 + nu*(1-alp)) / (1-alp)
+    gamma : 0.7
+    spread : 0.25
+    alp : 0.0
+    phi : 100.0
+    a : 0.85
+    piss_tr : 0.5
+  parameters:
+    spread : -2
+    beta_tr : 0.25
+    psi_dp : 1.5
+    psi_y : 0.0
+    phi : 100
+    rho_z : 0
+    rho_R : 0.6
+    rho_e : 0.8
+    sigma_e : 0.5
+    sigma_z : 0.3
+    sigma_r : 0.25
+    rho_z : 0.0
+    a : 0.5
+    sigma_r4 : 0.1
+    rho_r4 : 0.5
+  covariances:
+    eps_e : sigma_e^2
+    eps_z : sigma_z^2
+    eps_r : sigma_r^2
+
+  measurement_errors:
+    meas_pot  :   (0.00*1.782194)^2
+    meas_infl :   (0.00*0.208363)^2
+    meas_int  :   (0.00*2.254695)^2
+
+
+  markov_switching:
+    shock: eps_r
+    observable: int
+    construction: (int - 400*log(piss*theta/beta))/4 - rho_R*(int(-1) - 400*log(piss*theta/beta))/4 - (1-rho_R)*(psi_dp*(infl-4*piss_tr)/4 + psi_y*pot)
+    scaling: 4
+    states: rouwenhorst(rho_r4, sigma_r4, 5)
+
+estimation:
+  data:
+    file: 3obs.txt
+    start: 1992Q1
+  prior:
+    beta_tr : [gamma, 0.50, 0.20] 
+    #gamma : [normal, 0.5, 0.20]
+    #spread : [normal, 0.25, 0.125]
+    alp : [beta, 0.3, 0.05]
+    phi : [normal, 100, 25]
+    a : [beta, 0.5, 0.2]
+    rho_e : [beta, 0.6, 0.2]
+    rho_z : [beta, 0.6, 0.2]
+    sigma_e : [inv_gamma, 0.1, 4]
+    sigma_z : [inv_gamma, 0.1, 4]
+    sigma_r : [inv_gamma, 00.1, 4]
+    rho_R : [beta, 0.6, 0.2]
+    psi_dp : [normal, 1.5, 0.2]
+    psi_y : [normal, 0.0, 0.2]
+    piss_tr : [normal, 0.5, 0.1]
+    sigma_r4 : [inv_gamma, 0.1, 4]
+    rho_r4 : [beta, 0.6, 0.2]

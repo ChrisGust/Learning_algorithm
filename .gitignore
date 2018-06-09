@@ -1,0 +1,8 @@
+#.gitignore
+
+#~ files
+*.*~
+
+#Ed directories
+__pycache__/
+.ipynb_checkpoints/

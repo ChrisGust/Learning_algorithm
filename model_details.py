@@ -161,7 +161,6 @@ def calc_euler(ind_state,gridindex,acoeff,polyapp,params):
     for ifunc in np.arange(polyapp['nfunc']):
         polycur[ifunc] = np.dot(acoeff[ind_state,ifunc*npoly:(ifunc+1)*npoly],polyvarm1)
 
-    #get model variables assuming no ZLB
     msvm1 = po.msv2xx(polyapp['pgrid'][gridindex,:],nmsv,polyapp['scxx2msv'])
     ss = np.append(polyapp['exoggrid'][ind_state,:],msvm1[nmsv-nmsve:])
     (yy,dp,nr,lptp,posterior) = modelvariables(polycur,msvm1[:nmsv-nmsve],ss,params,nmsv,nmsve,nsreg,polyapp['gamma0'],polyapp['P'])
@@ -277,46 +276,38 @@ def solve_model(acoeff0,params,poly):
     acoeffstar,convergence = get_coeffs(acoeff0,params,poly,niter,stol,step)
     return(acoeffstar,convergence)
 
-def decr(endogvarm1,innov,acoeff,poly,params):
+def decr(endogvarm1,innov,regime,acoeff,poly,params):
     #Decision rule.
-    
+    endogvar = np.zeros(poly['nvars'])
     ne = poly['nexog_fe']
     npoly = poly['npoly']
     nmsv = poly['nmsv']
     nmsve = poly['nexog_nmsv']
-    newslag = poly['newslag']
-    ss = np.zeros(ne)
-    msv = np.zeros(nmsv)
+    nsreg = poly['nsreg']
+    nx = nmsv-nmsve-(nsreg-1)
+    ss = np.zeros(ne+nmsve)
+    msvm1 = np.zeros(nmsv)
     shocks = np.zeros(ne+1)
-    endogvar = dict.fromkeys(poly['varlist'],0.)
     
     #update non-monetary shocks and compute place on grid
-    endogvar['eta'] = params['rhoeta']*endogvarm1['eta'] + params['stdeta']*innov[0]
-    ss[0] = endogvar['eta']
+    endogvar[8] = params['rhoeta']*endogvarm1[8] + params['stdeta']*innov[0]
+    ss[0] = endogvar[8]
     ind_ss = po.get_index(ss,ne,poly['ngrid'],poly['steps'],poly['bounds'])
-    
-    
-
-    if (nmsv-nmsve >= 1):
-        msv[0] = endogvarm1['nr'] 
-    if (nmsv-nmsve >= 2):
-        msv[1] = endogvarm1['yy'] 
-    if (nmsv-nmsve == 3):
-        msv[2] = endogvarm1['dp'] 
-    msv[nmsv-nmsve] = endogvar['um']
-    for jn in np.arange(newslag):
-        msv[nmsv-nmsve+jn+1] = endogvar['u'+str(jn+1)]
-    xx = po.msv2xx(msv,nmsv,poly['scmsv2xx'])    
-    polycur = po.get_linspline(xx,ss,ind_ss,acoeff,poly['exoggrid'],poly['steps'],poly['nfunc'],\
-            poly['ngrid'],npoly,nmsv,ne)
-    xtilm1 = msv[:nmsv-nmsve]
-    shocks[0] = endogvar['eta']
-    if (ne == 2):
-        shocks[1] = endogvar['epp']
-    shocks[ne] = endogvar['um']
-    endogvar['yy'],endogvar['dp'],endogvar['nr'] = modelvariables(polycur,xtilm1,shocks,poly['zlbswitch'],2,params,poly['polyweight'],nmsv,nmsve,ne)
+    ss[1] = poly['gamma0'][regime]+params['stdm']*innov[1]
+    endogvar[11] = ss[1]
+    endogvar[10] = params['stdm']*innov[1]
+    endogvar[9] = poly['gamma0'][regime]
+    msvm1[:nx+nsreg-1] = endogvarm1[:nx+nsreg-1]
+    msvm1[nx+nsreg-1] = ss[1]
+    xxm1 = po.msv2xx(msvm1,nmsv,poly['scmsv2xx'])
+    polycur = po.get_linspline(xxm1,ss[:ne],ind_ss,acoeff,poly['exoggrid'],poly['steps'],poly['nfunc'],poly['ngrid'],npoly,nmsv,ne)
+    (yy,dp,nr,lptp,post) = modelvariables(polycur,msvm1[:nmsv-nmsve],ss,params,nmsv,nmsve,nsreg,poly['gamma0'],poly['P'])
+    endogvar[0] = nr
+    endogvar[1] = yy
+    endogvar[2] = dp
+    endogvar[nx:nx+nsreg-1] = lptp
+    endogvar[nx+nsreg-1:nx+2*nsreg-1] = post
     return(endogvar)
-
 
 #####################################
 #Test code
@@ -339,5 +330,12 @@ poly['gamma0'] = np.linspace(-psi_gam,psi_gam,nsreg)
 
 
 acoeff,convergence = solve_model(acoeff0,params,poly)
+
+innov = np.zeros(poly['ninnov'])
+endogvarm1 = np.zeros(poly['nvars'])
+nx = poly['nmsv']-poly['nexog_nmsv']+poly['nsreg']-1
+endogvarm1[nx:nx+nsreg-1] = np.log(0.001)
+regime = 2
+endogvar = decr(endogvarm1,innov,regime,acoeff,poly,params)
 
 

@@ -218,6 +218,7 @@ def initialize_poly(nexog_fe,nendog_nmsv,nsreg,ngrid):
     polyapp['nexog_nmsv'] = 1
     polyapp['nmsv'] = nendog_nmsv+polyapp['nsreg']-1+polyapp['nexog_nmsv']
     polyapp['npoly'] = 2*polyapp['nmsv']+1
+    
     polyapp['ninnov'] = polyapp['nexog_fe']+polyapp['nexog_nmsv']
     if polyapp['nexog_fe'] != 1:
         exit('There must be one non-monetary shock (initialize_poly)')
@@ -231,6 +232,10 @@ def initialize_poly(nexog_fe,nendog_nmsv,nsreg,ngrid):
     polyapp['nqs'] = np.prod(polyapp['nquad'])
     polyapp['pgrid'],polyapp['bbt'],polyapp['bbtinv'] = sparsegrid(polyapp['nmsv'],polyapp['npoly'])
     acoeff0 = np.zeros([polyapp['ns'],polyapp['nfunc']*polyapp['npoly']])
-    #polyapp['varlist'] = ['nr','yy','dp','um']
+    if (nsreg == 3):
+        polyapp['varlist'] = ['nr','yy','dp','lp1m1','lp3m1','p1t','p2t','p3t','eta','gamma0','epm','gamma0+epm']
+        polyapp['nvars'] = len(polyapp['varlist'])
+    else:
+        exit('These must be 3 regimes')
     return(acoeff0,polyapp)
 

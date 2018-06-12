@@ -328,12 +328,11 @@ poly['P'] = po.transmat(nsreg,p_gam,p_gam)
 psi_gam = np.sqrt(nsreg-1)*params['stdgam']
 poly['gamma0'] = np.linspace(-psi_gam,psi_gam,nsreg)
 
-
 acoeff,convergence = solve_model(acoeff0,params,poly)
 
 innov = np.zeros(poly['ninnov'])
 endogvarm1 = np.zeros(poly['nvars'])
-nx = poly['nmsv']-poly['nexog_nmsv']+poly['nsreg']-1
+nx = poly['nmsv']-poly['nexog_nmsv']-(poly['nsreg']-1)
 endogvarm1[nx:nx+nsreg-1] = np.log(0.001)
 regime = 2
 endogvar = decr(endogvarm1,innov,regime,acoeff,poly,params)

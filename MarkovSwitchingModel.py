@@ -79,7 +79,7 @@ from numba import njit
 
 
 
-
+@njit
 def _markov_switching_learning_lik(yy, TT, RR, QQ, DD, ZZ, HH, EXPeffect_f, Pt, obs_ind,
                                    shock_ind, initial_distribution, transition, shock_scaling,
                                    conditional_mean, conditional_variance, shocks):
@@ -141,7 +141,7 @@ def _markov_switching_learning_lik(yy, TT, RR, QQ, DD, ZZ, HH, EXPeffect_f, Pt, 
         filtered_prob = forecast_prob * zetat / (forecast_prob * zetat).sum()
 
         # forecasting
-        At = TT @ At1 + RR[:, shock_ind]*epsr  + EXPeffect_f @ filtered_prob;
+        At = TT @ At1 + RR[:, shock_ind]*epsr  + EXPeffect_f @ filtered_prob
         Pt = TT @ Pt1 @ TT.T + RQR2
         Pt = 0.5*(Pt + Pt.T)
 
@@ -194,85 +194,135 @@ class MarkovSwitchingStateSpaceModel(StateSpaceModel.LinearDSGEModel):
         self.shock_ind = self.shock_names.index(self.shock_var)
         self.obs_ind = self.obs_names.index(self.obs_var)
 
+    def get_EXPeffect(self, p0, nsum=100):
+
+        # Solve the model
+        GAM0 = self.GAM0(p0)
+        GAM1 = self.GAM1(p0)
+        PSI = self.PSI(p0)
+        PPI = self.PPI(p0)
+
+        TT, RR, M, TZ, TY, RC = gensys(GAM0, GAM1, PSI, PPI, return_everything=True)
+
+        # get EXPeffect_f
+        initial_distribution = np.array(self.initial_distribution(p0),dtype=float).squeeze()
+        filtered_prob = initial_distribution
+         
+        strans = self.transition(p0)
+        sigrq = np.asarray(np.sqrt(self.conditional_variance(p0))).squeeze()
+        epsr_m = self.conditional_mean(p0).squeeze()
+         
+        ns, nj = TT.shape[0], initial_distribution.size
+        EXPeffect_f = np.zeros((ns, nj))
+         
+        Mj = np.eye(M.shape[0])
+        strans = np.atleast_2d(strans)
+        stransj = strans
+
+        neps = RR.shape[1]
+        noshock = ~(np.arange(neps)==self.shock_ind)
+        shocksel = np.zeros(neps)
+        shocksel[~noshock] = 1
+
+
+        for j in range(nsum):
+            # forward looking
+            EXPeffect_f = EXPeffect_f +  (TY @ Mj @ TZ @ shocksel)[:, np.newaxis] @ ( epsr_m.T @ stransj )[np.newaxis, :]
+
+            # myopic 
+            #EXPeffect_m = EXPeffect_m +  TY @ Mj @ TZ @ shocksel @ ( epsr_m.T )
+
+            Mj = Mj @ M;
+            stransj = stransj @ strans
+
+        EXPeffect_f = np.real(EXPeffect_f)
+        
+        return EXPeffect_f
+
+       
+    def impulse_response(self, p0, shock=1., initial_distribution=None, h=20):
+        
+        if np.array(shock).size==1:
+            shocks = np.zeros((h,))
+            shocks[0] = shock
+        else:
+            shocks = np.array(shock)
+            h = shocks.size
+
+        # get standard irfs
+        # irfs = super().impulse_response(p0, h=h)
+
+        EXPeffect_f = self.get_EXPeffect(p0)
+        TT, RR, QQ, DD, ZZ, HH = self.system_matrices(p0)
+
+        if initial_distribution is None:
+            initial_distribution = np.array(self.initial_distribution(p0),dtype=float).squeeze()
+
+        strans = self.transition(p0)
+        sigrq = np.asarray(np.sqrt(self.conditional_variance(p0))).squeeze()
+        epsr_m = self.conditional_mean(p0).squeeze()
+
+        shock_var = self.shock_var
+        shock_ind = self.shock_names.index(shock_var)
+
+        At = np.zeros((TT.shape[0], ))
+        forecast_prob = initial_distribution
+
+        irf_states = np.zeros((h, TT.shape[0]))
+        nj = initial_distribution.size
+        irf_probs = np.zeros((h, nj))
+
+        for t in range(h):
+
+            epsr = shocks[t]
+            
+            zetat = np.exp(-0.5*((epsr-epsr_m)/sigrq)**2)/sigrq
+            filtered_prob = forecast_prob * zetat / (forecast_prob * zetat).sum()
+            At = TT @ At + RR[:, shock_ind]*epsr  + EXPeffect_f @ filtered_prob
+
+            irf_states[t] = At
+            irf_probs[t] = filtered_prob
+
+            forecast_prob = strans @ filtered_prob
+
+        Ats = p.DataFrame(irf_states, columns=self.state_names, index=range(h))
+        xts = p.DataFrame(irf_probs, columns=['pj%d' % d for d in range(nj)], index=range(h))
+        res = p.concat([Ats, xts], axis=1)
+        
+        #irfs[shock_var] = res
+
+        return res
+ 
+
     def log_lik(self, p0, y=None, return_filtered=False):
 
        yy = np.array(self.yy)
-       nobs = yy.shape[0]
-       GAM0 = self.GAM0(p0)
-       GAM1 = self.GAM1(p0)
-       PSI = self.PSI(p0)
-       PPI = self.PPI(p0)
 
-       TT, RR, M, TZ, TY, RC = gensys(GAM0, GAM1, PSI, PPI, return_everything=True)
        TT, RR, QQ, DD, ZZ, HH = self.system_matrices(p0)
+       EXPeffect_f = self.get_EXPeffect(p0)
 
-
-       neps = RR.shape[1]
-       ny, ns = ZZ.shape
-       noshock = ~(np.arange(neps)==self.shock_ind)
-       RRnoshock = RR[:, noshock]
-       QQnoshock = QQ[np.ix_(noshock, noshock)]
-
-
-
-       noobs = ~(np.arange(ny)==self.obs_ind)
-       ZZnoobs = ZZ[noobs, :]
-       DDnoobs = DD[noobs, :]
        RQR = np.dot(np.dot(RR, QQ), RR.T)
-       RQR2 = RRnoshock @ QQnoshock@ RRnoshock.T
+
        try:
            Pt = solve_discrete_lyapunov(TT, RQR)
            Pt = TT @ Pt @ TT.T + RQR
        except:
            return -1000000000.0
-       At = np.zeros(shape=(ns))
-
-       yhat = ZZ @ At + DD.squeeze()
-       nut = yy[0, :] - yhat
-       Ft = ZZ @ Pt @ ZZ.T + HH
-       Ft = 0.5*(Ft + Ft.T)
-       iFtnut = np.linalg.solve(Ft, nut)
-
-       At = At + Pt @ ZZ.T @ iFtnut;
-       Pt = Pt - Pt @ ZZ.T @ np.linalg.inv(Ft) @ ZZ @ Pt.T
 
        initial_distribution = np.array(self.initial_distribution(p0),dtype=float).squeeze()
-       filtered_prob = initial_distribution
 
        strans = self.transition(p0)
        sigrq = np.asarray(np.sqrt(self.conditional_variance(p0))).squeeze()
        epsr_m = self.conditional_mean(p0).squeeze()
 
-
+       nobs = yy.shape[0]
        shocks = np.zeros(nobs)
        for t in range(1, nobs):
            shocks[t]  = self.construct_shock(p0, yy[t], yy[t-1])
 
 
-
-       nj = initial_distribution.size
-       EXPeffect_f = np.zeros((ns, nj))
-       EXPeffect_m = np.zeros((ns, nj))
-
-       Mj = np.eye(M.shape[0])
-       strans = np.atleast_2d(strans)
-       stransj = strans
-
-       shocksel = np.zeros(neps)
-       shocksel[~noshock] = 1
-
-       filtered_mean_mat = np.zeros((nobs, ns))
-       filtered_prob_mat = np.zeros((nobs, nj))
-
        epsr_m = np.atleast_1d(np.array(epsr_m))
 
-       for j in range(100):
-           EXPeffect_f = EXPeffect_f +  (TY @ Mj @ TZ @ shocksel)[:, np.newaxis] @ ( epsr_m.T @ stransj )[np.newaxis, :]
-           #EXPeffect_m = EXPeffect_m +  TY @ Mj @ TZ @ shocksel @ ( epsr_m.T )
-
-           Mj = Mj @ M;
-           stransj = stransj @ strans
-       EXPeffect_f = np.real(EXPeffect_f)
 
        try:
            res = _markov_switching_learning_lik(yy, TT, RR, QQ, DD.squeeze(),

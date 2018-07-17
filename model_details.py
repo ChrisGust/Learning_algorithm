@@ -313,7 +313,7 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
 #Test code
 ###################################
 
-params = {'beta': 0.99, 'eta': 0.0025, 'gamma': 0.0, 'epp': 6.0, 'phip': 100.0, 'dpss': 0.005, 'ap': 1.0, 'rhor' : 0.0, 'gammapi': 1.5, 'gammax': 0.25, 'stdm' : 0.0008, \
+params = {'beta': 0.99, 'eta': 0.0025, 'gamma': 0.6, 'epp': 6.0, 'phip': 100.0, 'dpss': 0.005, 'ap': 1.0, 'rhor' : 0.8, 'gammapi': 1.5, 'gammax': 0.25, 'stdm' : 0.0008, \
           'rhoeta' : 0.85, 'stdeta' : 0.003, 'rhogam': 0.9, 'stdgam' : 0.001}
 
 nexog_fe = 1

@@ -37,11 +37,11 @@ calibration:
     piss : 1+piss_tr/100
     omega : 1.0/(1.0+beta*(1.0-a))
     xi : (1 + nu*(1-alp)) / (1-alp)
-    gamma : 0.7
+    gamma : 0.0
     spread : 0.25
     alp : 0.0
     phi : 100.0
-    a : 0.85
+    a : 1.0
     piss_tr : 0.5
   parameters:
     spread : -2

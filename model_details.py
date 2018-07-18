@@ -1,8 +1,8 @@
 import numpy as np
 import polydef as po
 
-import importlib
-importlib.reload(po)
+#import importlib
+#importlib.reload(po)
 
 #############################################################
 #Initialize Polynomial Part Dependent on Model
@@ -277,7 +277,6 @@ def solve_model(acoeff0,params,poly):
     return(acoeffstar,convergence)
 
 def decr(endogvarm1,innov,regime,acoeff,poly,params):
-    #Decision rule.
     endogvar = np.zeros(poly['nvars'])
     ne = poly['nexog_fe']
     npoly = poly['npoly']
@@ -309,32 +308,7 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     endogvar[nx+nsreg-1:nx+2*nsreg-1] = post
     return(endogvar)
 
-#####################################
-#Test code
-###################################
 
-params = {'beta': 0.99, 'eta': 0.0025, 'gamma': 0.6, 'epp': 6.0, 'phip': 100.0, 'dpss': 0.005, 'ap': 1.0, 'rhor' : 0.8, 'gammapi': 1.5, 'gammax': 0.25, 'stdm' : 0.0008, \
-          'rhoeta' : 0.85, 'stdeta' : 0.003, 'rhogam': 0.9, 'stdgam' : 0.001}
 
-nexog_fe = 1
-nendog_nmsv = 3
-nsreg = 3
-ngrid = np.ones(nexog_fe,dtype=int)
-ngrid[0] = 3
-acoeff0,poly = po.initialize_poly(nexog_fe,nendog_nmsv,nsreg,ngrid) 
-               
-p_gam = (1.0+params['rhogam'])/2.0
-poly['P'] = po.transmat(nsreg,p_gam,p_gam)
-psi_gam = np.sqrt(nsreg-1)*params['stdgam']
-poly['gamma0'] = np.linspace(-psi_gam,psi_gam,nsreg)
-
-acoeff,convergence = solve_model(acoeff0,params,poly)
-
-innov = np.zeros(poly['ninnov'])
-endogvarm1 = np.zeros(poly['nvars'])
-nx = poly['nmsv']-poly['nexog_nmsv']-(poly['nsreg']-1)
-endogvarm1[nx:nx+nsreg-1] = np.log(0.001)
-regime = 2
-endogvar = decr(endogvarm1,innov,regime,acoeff,poly,params)
 
 

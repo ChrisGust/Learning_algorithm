@@ -72,10 +72,6 @@ def get_griddetails(polyapp,params):
         polyapp['ns'],polyapp['rhos'],polyapp['stds'],polyapp['maxstd'])
     polyapp['quadgrid'],polyapp['quadweight'] = po.get_quadgrid(polyapp['nquad'],polyapp['ninnov'],polyapp['nqs'])
     polyapp['sfutquad'],polyapp['ind_sfutquad'],polyapp['quadweights'] = get_quadstates(polyapp,params)
-
-    #print('sfut = ', polyapp['sfutquad'][:,1,10])
-    #sys.exit()
-    
     return(polyapp)
 
 # #############################################################
@@ -84,8 +80,6 @@ def get_griddetails(polyapp,params):
 
 def modelvariables(polycur,xtilm1,shocks,params,nmsv,nmsve,nsreg,gamma0,Pmat):
     #return model variables given expected output and inflation.
-    #from sys import exit
-
     
     nx = nmsv-nmsve-(nsreg-1)
     #reduced form parameters
@@ -255,7 +249,7 @@ def get_coeffs(acoeff0,params,poly,niter,stol,step):
 
         #print(acoeffnew[:,nfunc*npoly:(nfunc*npoly+npoly)].round(4))
         #sys.exit()
-        print(avgerror)
+        #print(avgerror)
         
         if np.any(np.isnan(acoeffnew)):  #return acoeff
             break
@@ -307,6 +301,30 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     endogvar[nx:nx+nsreg-1] = lptp
     endogvar[nx+nsreg-1:nx+2*nsreg-1] = post
     return(endogvar)
+
+def simulate(TT,endogvarm1,innov,regime,acoeff,poly,params):
+    #Simulates data or compute IRFS  as deviation from unshocked baseline depending on irfswitch
+    import pandas as pd
+    from sys import exit
+    
+    varlist = ['nr','yy','dp','lp1m1','lp3m1','p1','p2','p3','eta','gamma0','epm','gamma0+epm']
+    nvars = len(varlist)
+    if (nvars != poly['nvars']):
+        exit('Stopped in computing IRFs. List of variables in model_details,simulate not specified correctly')
+        
+    irfdf = pd.DataFrame(np.zeros([TT,nvars]),columns=varlist)
+    endogvarm1_s = endogvarm1
+    innov_sp = np.zeros(poly['ninnov'])
+    for tt in np.arange(TT):
+        if (tt == 0):
+            innov_s = innov
+        else:
+            innov_s = innov_sp
+        endogvar = decr(endogvarm1_s,innov_s,regime,acoeff,poly,params)
+        for i,x in enumerate(varlist):
+            irfdf.loc[tt,x] = 100.0*endogvar[i]
+        endogvarm1_s = endogvar
+    return(irfdf)
 
 
 

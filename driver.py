@@ -4,8 +4,8 @@ import numpy as np
 import polydef as po
 import model_details as md
 
-#import importlib
-#importlib.reload(md)
+import importlib
+importlib.reload(md)
 
 #####################################
 #Compute IRFs from linear solution algorithm plus learning
@@ -26,11 +26,13 @@ p0[9] = 0.1
 p0[10] = 0.9
 param_d = dict(zip(paramlist,p0))
 
-nkirf = nk.impulse_response(p0, shock=0.,h=1)
+nkirf = nk.impulse_response(p0, shock=0.,h=10)
 
 ############################################
 #Computes IRFs from projection method.
 ############################################
+
+get_solution_from_disk = True
 
 #To make parameters equivalent to above may need to make changes to yaml file (gamma,ap,phip,etc.)  
 params = {'beta': 1/(1+p0[1]/100), 'eta': 0.0025, 'gamma': 0.0, 'epp': 6.0, 'phip': 100.0, 'dpss': 0.005, 'ap': 1.0, 'rhor' : p0[6], 'gammapi': p0[7], 'gammax': p0[8], \
@@ -50,7 +52,16 @@ psi_gam = np.sqrt(nsreg-1)*params['stdgam']
 poly['gamma0'] = np.linspace(-psi_gam,psi_gam,nsreg)
 
 #solve model
-acoeff,convergence = md.solve_model(acoeff0,params,poly)
+if (get_solution_from_disk == False):
+    acoeff,convergence = md.solve_model(acoeff0,params,poly)
+    if (convergence == True):
+        print('Model solved successfully.')
+        np.save('solution_coeffs.npy',acoeff)
+    else:
+        print('Model failed to solve')
+else:
+    poly = md.get_griddetails(poly,params)
+    acoeff = np.load('solution_coeffs.npy')
 
 #construct IRFs
 innov = np.zeros(poly['ninnov'])
@@ -58,7 +69,9 @@ endogvarm1 = np.zeros(poly['nvars'])
 nx = poly['nmsv']-poly['nexog_nmsv']-(poly['nsreg']-1)
 endogvarm1[nx:nx+nsreg-1] = np.log(0.25)
 regime = 1
-endogvar = md.decr(endogvarm1,innov,regime,acoeff,poly,params)
+TT = 10
+irfdf = md.simulate(TT,endogvarm1,innov,regime,acoeff,poly,params)
+
 
 ####nsreg = 3
 #acoeff elements:
@@ -68,6 +81,3 @@ endogvar = md.decr(endogvarm1,innov,regime,acoeff,poly,params)
 # log(p1) 7 8
 # log(p3) 9 10
 #  agg 11 12
-
-#endogvar elements
-#0: nr, 1: yy, 2: dp, 3:4 lptp, 5:6:7: pt|t, 8: eta, 9: gamma0, 10: epm, 11: gamma0+epm

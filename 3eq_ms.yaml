@@ -75,7 +75,7 @@ calibration:
     observable: int
     construction: (int - 400*log(piss*theta/beta))/4 - rho_R*(int(-1) - 400*log(piss*theta/beta))/4 - (1-rho_R)*(psi_dp*(infl-4*piss_tr)/4 + psi_y*pot)
     scaling: 4
-    states: rouwenhorst(rho_r4, sigma_r4, 3)
+    states: rouwenhorst(rho_r4, sigma_r4, 2)
 
 estimation:
   data:

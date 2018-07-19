@@ -48,8 +48,11 @@ def get_griddetails(polyapp,params):
     if (nx == 3):
             polyapp['msvbounds'][2] = -0.02
             polyapp['msvbounds'][nmsv+2] = 0.02
-    
-    ubd = np.log(0.96)
+
+    if (nsreg == 2):
+        ubd = np.log(0.999)
+    else:
+        ubd = np.log(0.96)
     for i in np.arange(nsreg-1):
         polyapp['msvbounds'][nx+i] = np.log(0.0001)
         polyapp['msvbounds'][nmsv+nx+i] = ubd
@@ -108,12 +111,17 @@ def modelvariables(polycur,xtilm1,shocks,params,nmsv,nmsve,nsreg,gamma0,Pmat):
     nomrhat = params['rhor']*nrm1 + (1.0-params['rhor'])*(params['gammapi']*dphat+params['gammax']*yyhat)+shocks[1]
 
     #update beliefs
-    mid = np.int((nsreg+1)/2)
     prior = np.zeros(nsreg)
-    prior[0:mid-1] = np.exp(xtilm1[nx:nx+mid-1])
-    prior[mid:] = np.exp(xtilm1[nx+mid-1:nx+nsreg-1])
-    temp_arr = np.append(prior[:mid-1],prior[mid:])
-    prior[mid-1] = 1.0-np.sum(temp_arr)
+    if (nsreg == 2):
+        prior[0] = np.exp(xtilm1[nx])
+        prior[1] = 1.0-prior[0]
+    else:
+        mid = np.int((nsreg+1)/2)
+        prior[0:mid-1] = np.exp(xtilm1[nx:nx+mid-1])
+        prior[mid:] = np.exp(xtilm1[nx+mid-1:nx+nsreg-1])
+        temp_arr = np.append(prior[:mid-1],prior[mid:])
+        prior[mid-1] = 1.0-np.sum(temp_arr)
+
     lik = np.zeros(nsreg)
     denominator = 0.0
     for i in np.arange(nsreg):
@@ -128,16 +136,21 @@ def modelvariables(polycur,xtilm1,shocks,params,nmsv,nmsve,nsreg,gamma0,Pmat):
             posterior[i] = prior[i]*lik[i]/denominator
     ptp_c_t = Pmat.dot(posterior)
     lptp = np.zeros(nsreg-1)
-    for i in np.arange(mid-1):
-        if (ptp_c_t[i] < 1e-08):
-            lptp[i] = np.log(1e-08)
-        else:
-            lptp[i] = np.log(ptp_c_t[i])
-
-        if (ptp_c_t[mid+i] < 1e-08):
-            lptp[mid-1+i] = np.log(1e-08)
-        else:
-            lptp[mid-1+i] = np.log(ptp_c_t[mid+i])        
+    if nsreg == 2:
+       if ptp_c_t[0] < 1e-08:
+           lptp[0] = np.log(1e-08)
+       else:
+           lptp[0] = np.log(ptp_c_t[0])
+    else:
+        for i in np.arange(mid-1):
+            if (ptp_c_t[i] < 1e-08):
+                lptp[i] = np.log(1e-08)
+            else:
+                lptp[i] = np.log(ptp_c_t[i])
+            if (ptp_c_t[mid+i] < 1e-08):
+                lptp[mid-1+i] = np.log(1e-08)
+            else:
+                lptp[mid-1+i] = np.log(ptp_c_t[mid+i])        
     return(yyhat,dphat,nomrhat,lptp,posterior)
                 
 def calc_euler(ind_state,gridindex,acoeff,polyapp,params):
@@ -172,16 +185,20 @@ def calc_euler(ind_state,gridindex,acoeff,polyapp,params):
     if (nx == 3):
         msv[2] = dp
 
-    mid = np.int((nsreg+1)/2)
-    msv[nx:nx+mid-1] = lptp[:mid-1]
-    msv[nx+mid-1:nx+nsreg] = lptp[mid-1:]
-
-    ptp_c_t = np.zeros(nsreg)
-    ptp_c_t[0:mid-1] = np.exp(msv[nx:nx+mid-1])
-    ptp_c_t[mid:] = np.exp(msv[nx+mid:nx+nsreg])
-
-    temp_arr = np.append(ptp_c_t[:mid-1],ptp_c_t[mid:])
-    ptp_c_t[mid-1] = 1.0-np.sum(temp_arr)
+    ptp_c_t = np.zeros(nsreg)    
+    if (nsreg == 2):
+        msv[nx] = lptp[0]
+        ptp_c_t[0] = np.exp(msv[nx])
+        ptp_c_t[1] = 1.0-ptp_c_t[0]
+    else:
+        mid = np.int((nsreg+1)/2)
+        msv[nx:nx+mid-1] = lptp[:mid-1]
+        msv[nx+mid-1:nx+nsreg] = lptp[mid-1:]
+        ptp_c_t[0:mid-1] = np.exp(msv[nx:nx+mid-1])
+        ptp_c_t[mid:] = np.exp(msv[nx+mid:nx+nsreg])
+        temp_arr = np.append(ptp_c_t[:mid-1],ptp_c_t[mid:])
+        ptp_c_t[mid-1] = 1.0-np.sum(temp_arr)
+    
     for ireg in np.arange(nsreg):
         for j in np.arange(polyapp['nqs']):
             shockall = ss_futmat[j,:]
@@ -283,13 +300,13 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     shocks = np.zeros(ne+1)
     
     #update non-monetary shocks and compute place on grid
-    endogvar[8] = params['rhoeta']*endogvarm1[8] + params['stdeta']*innov[0]
-    ss[0] = endogvar[8]
+    endogvar[-4] = params['rhoeta']*endogvarm1[-4] + params['stdeta']*innov[0]
+    ss[0] = endogvar[-4]
     ind_ss = po.get_index(ss,ne,poly['ngrid'],poly['steps'],poly['bounds'])
     ss[1] = poly['gamma0'][regime]+params['stdm']*innov[1]
-    endogvar[11] = ss[1]
-    endogvar[10] = params['stdm']*innov[1]
-    endogvar[9] = poly['gamma0'][regime]
+    endogvar[-1] = ss[1]
+    endogvar[-2] = params['stdm']*innov[1]
+    endogvar[-3] = poly['gamma0'][regime]
     msvm1[:nx+nsreg-1] = endogvarm1[:nx+nsreg-1]
     msvm1[nx+nsreg-1] = ss[1]
     xxm1 = po.msv2xx(msvm1,nmsv,poly['scmsv2xx'])
@@ -298,7 +315,10 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     endogvar[0] = nr
     endogvar[1] = yy
     endogvar[2] = dp
-    endogvar[nx:nx+nsreg-1] = lptp
+    if nsreg == 2:
+        endogvar[nx] = lptp
+    else:
+        endogvar[nx:nx+nsreg-1] = lptp
     endogvar[nx+nsreg-1:nx+2*nsreg-1] = post
     return(endogvar)
 
@@ -307,12 +327,11 @@ def simulate(TT,endogvarm1,innov,regime,acoeff,poly,params):
     import pandas as pd
     from sys import exit
     
-    varlist = ['nr','yy','dp','lp1m1','lp3m1','p1','p2','p3','eta','gamma0','epm','gamma0+epm']
-    nvars = len(varlist)
+    nvars = len(poly['varlist'])
     if (nvars != poly['nvars']):
         exit('Stopped in computing IRFs. List of variables in model_details,simulate not specified correctly')
         
-    irfdf = pd.DataFrame(np.zeros([TT,nvars]),columns=varlist)
+    irfdf = pd.DataFrame(np.zeros([TT,nvars]),columns=poly['varlist'])
     endogvarm1_s = endogvarm1
     innov_sp = np.zeros(poly['ninnov'])
     for tt in np.arange(TT):
@@ -321,7 +340,7 @@ def simulate(TT,endogvarm1,innov,regime,acoeff,poly,params):
         else:
             innov_s = innov_sp
         endogvar = decr(endogvarm1_s,innov_s,regime,acoeff,poly,params)
-        for i,x in enumerate(varlist):
+        for i,x in enumerate(poly['varlist']):
             irfdf.loc[tt,x] = 100.0*endogvar[i]
         endogvarm1_s = endogvar
     return(irfdf)

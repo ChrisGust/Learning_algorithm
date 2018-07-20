@@ -38,7 +38,7 @@ calibration:
     omega : 1.0/(1.0+beta*(1.0-a))
     xi : (1 + nu*(1-alp)) / (1-alp)
     gamma : 0.0
-    spread : 0.25
+    spread : 0.0
     alp : 0.0
     phi : 100.0
     a : 1.0

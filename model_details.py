@@ -322,24 +322,36 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     endogvar[nx+nsreg-1:nx+2*nsreg-1] = post
     return(endogvar)
 
-def simulate(TT,endogvarm1,innov,regime,acoeff,poly,params):
-    #Simulates data or compute IRFS  as deviation from unshocked baseline depending on irfswitch
+def simulate(TT,endogvarm1,innov,regime,acoeff,poly,params,irfswitch=1):
+    #Simulates data or compute IRFs.
     import pandas as pd
+    from random import randint
     from sys import exit
     
     nvars = len(poly['varlist'])
     if (nvars != poly['nvars']):
         exit('Stopped in computing IRFs. List of variables in model_details,simulate not specified correctly')
-        
     irfdf = pd.DataFrame(np.zeros([TT,nvars]),columns=poly['varlist'])
+
+    if irfswitch == 0:
+        rng = np.random.RandomState(1238)
+        innovall = rng.randn(poly['ninnov'],TT)
+        regimeall = [randint(0, poly['nsreg']-1) for p in range(0, TT)]
+        
     endogvarm1_s = endogvarm1
     innov_sp = np.zeros(poly['ninnov'])
     for tt in np.arange(TT):
         if (tt == 0):
             innov_s = innov
+            regime0 = regime
         else:
-            innov_s = innov_sp
-        endogvar = decr(endogvarm1_s,innov_s,regime,acoeff,poly,params)
+            if irfswitch == 0:
+                innov_s = innovall[:,tt]
+                regime0 = regimeall[tt]
+            else:
+                innov_s = innov_sp
+                regime0 = regime
+        endogvar = decr(endogvarm1_s,innov_s,regime0,acoeff,poly,params)
         for i,x in enumerate(poly['varlist']):
             irfdf.loc[tt,x] = 100.0*endogvar[i]
         endogvarm1_s = endogvar

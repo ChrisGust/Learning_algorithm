@@ -2,6 +2,7 @@
 
 #~ files
 *.*~
+*.npy
 
 #Ed directories
 __pycache__/

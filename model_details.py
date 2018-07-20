@@ -300,18 +300,20 @@ def decr(endogvarm1,innov,regime,acoeff,poly,params):
     shocks = np.zeros(ne+1)
     
     #update non-monetary shocks and compute place on grid
-    endogvar[-4] = params['rhoeta']*endogvarm1[-4] + params['stdeta']*innov[0]
-    ss[0] = endogvar[-4]
+    endogvar[-6] = params['rhoeta']*endogvarm1[-4] + params['stdeta']*innov[0]
+    ss[0] = endogvar[-6]
     ind_ss = po.get_index(ss,ne,poly['ngrid'],poly['steps'],poly['bounds'])
     ss[1] = poly['gamma0'][regime]+params['stdm']*innov[1]
-    endogvar[-1] = ss[1]
-    endogvar[-2] = params['stdm']*innov[1]
-    endogvar[-3] = poly['gamma0'][regime]
+    endogvar[-3] = ss[1]
+    endogvar[-4] = params['stdm']*innov[1]
+    endogvar[-5] = poly['gamma0'][regime]
     msvm1[:nx+nsreg-1] = endogvarm1[:nx+nsreg-1]
     msvm1[nx+nsreg-1] = ss[1]
     xxm1 = po.msv2xx(msvm1,nmsv,poly['scmsv2xx'])
     polycur = po.get_linspline(xxm1,ss[:ne],ind_ss,acoeff,poly['exoggrid'],poly['steps'],poly['nfunc'],poly['ngrid'],npoly,nmsv,ne)
     (yy,dp,nr,lptp,post) = modelvariables(polycur,msvm1[:nmsv-nmsve],ss,params,nmsv,nmsve,nsreg,poly['gamma0'],poly['P'])
+    endogvar[-2] = polycur[0]
+    endogvar[-1] = polycur[1]
     endogvar[0] = nr
     endogvar[1] = yy
     endogvar[2] = dp

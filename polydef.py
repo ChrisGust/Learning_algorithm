@@ -236,7 +236,7 @@ def initialize_poly(nexog_fe,nendog_nmsv,nsreg,ngrid):
         polyapp['varlist'] = ['nr','yy','dp','lp1m1','lp3m1','p1t','p2t','p3t','eta','gamma0','epm','gamma0+epm']
         polyapp['nvars'] = len(polyapp['varlist'])
     else:
-        polyapp['varlist'] = ['nr','yy','dp','lp1m1','p1t','p2t','eta','gamma0','epm','gamma0+epm']
+        polyapp['varlist'] = ['nr','yy','dp','lp1m1','p1t','p2t','eta','gamma0','epm','gamma0+epm','Eyy','Edp']
         polyapp['nvars'] = len(polyapp['varlist'])
     return(acoeff0,polyapp)
 

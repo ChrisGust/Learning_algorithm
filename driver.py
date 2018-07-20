@@ -3,6 +3,8 @@
 import numpy as np
 import polydef as po
 import model_details as md
+import matplotlib.pyplot as plt
+import pandas as pd
 import sys
 
 import importlib
@@ -34,7 +36,7 @@ nkirf = nk.impulse_response(p0, shock=0.,h=1)
 #Computes IRFs from projection method.
 ############################################
 
-get_solution_from_disk = False
+get_solution_from_disk = True
 
 #To make parameters equivalent to above may need to make changes to yaml file (gamma,ap,phip,etc.)  
 params = {'beta': 1/(1+p0[0]/100), 'eta': 0.0025, 'gamma': 0.0, 'epp': 6.0, 'phip': 100.0, 'dpss': 0.005, 'ap': 1.0, 'rhor' : p0[6], 'gammapi': p0[7], 'gammax': p0[8], \
@@ -77,16 +79,45 @@ else:
     endogvarm1[nx:nx+nsreg-1] = np.log(0.25)
     regime = 1
 
+#plot decision rule
+N_epm = 51
+mon_agg = np.linspace(-1.75,1.75,num=N_epm)+innov[1]
+innov0 = np.zeros(poly['ninnov'])
+decruledf = pd.DataFrame(np.zeros([N_epm,poly['nvars']]),columns=poly['varlist'])
+for i in np.arange(N_epm):
+    innov0[1] = mon_agg[i]
+    endogvar = md.decr(endogvarm1,innov0,regime,acoeff,poly,params)
+    for j,x in enumerate(poly['varlist']):
+            decruledf.loc[i,x] = 100.0*endogvar[j]
+decruledf['rr'] = decruledf['nr']-decruledf['Edp']
 
-TT = 5000
-irfdf = md.simulate(TT,endogvarm1,innov,regime,acoeff,poly,params,irfswitch=0)
-model_stats = irfdf.describe()
-    
-TT = 1
-irfdf = md.simulate(TT,endogvarm1,innov,regime,acoeff,poly,params,irfswitch=1)
+fig1,ax1 = plt.subplots(2,2)
+ax1[0,0].set_title('Expected Inflation')
+ax1[0,0].plot(decruledf['gamma0+epm'],decruledf['Edp'],'k-',linewidth=3)
+ax1[0,0].set_xlabel('Agg Policy Shock')
 
+ax1[0,1].set_title('Probability of Low Gamma0 Regime')
+ax1[0,1].plot(decruledf['gamma0+epm'],decruledf['p1t'],'k-',linewidth=3)
+ax1[0,1].set_xlabel('Agg Policy Shock')
 
+ax1[1,0].set_title('Nominal Rate')
+ax1[1,0].plot(decruledf['gamma0+epm'],decruledf['nr'],'k-',linewidth=3)
+ax1[1,0].set_xlabel('Agg Policy Shock')
 
+ax1[1,1].set_title('Real Rate')
+ax1[1,1].plot(decruledf['gamma0+epm'],decruledf['rr'],'k-',linewidth=3)
+ax1[1,1].set_xlabel('Agg Policy Shock')
+plt.tight_layout()
+plt.show()
+
+#simulate data
+# TT = 5000
+# irfdf = md.simulate(TT,endogvarm1,innov,regime,acoeff,poly,params,irfswitch=0)
+# model_stats = irfdf.describe()
+
+#construct IRFs
+#TT = 1
+#irfdf = md.simulate(TT,endogvarm1,innov,regime,acoeff,poly,params,irfswitch=1)
 
 ####nsreg = 3
 #acoeff elements:
